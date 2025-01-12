@@ -236,7 +236,7 @@ def lancerDeadlyEnemyCrit(numD3, numD6):
                                functionParameters=[1, 0])
 
 
-def applyDamageOperations(avgDamage, baseDamage=0, armor=0, resistance=False, exposed=False):
+def applyDamageOperations(avgDamage, baseDamage=0, armor=0, isAP=False, resistance=False, exposed=False):
     # Lancer damage operations:
     # Roll Damage,
     # Exposed,
@@ -246,13 +246,14 @@ def applyDamageOperations(avgDamage, baseDamage=0, armor=0, resistance=False, ex
     damage = avgDamage + baseDamage
     if exposed:
         damage *= 2
-    damage -= armor
+    if not isAP:
+        damage -= armor
     if resistance:
         damage /= 2
     return max(0, damage)
 
 
-def calculateAverageDamage(hitCritValues=(.5, .05, .45), numD3=0, numD6=1, baseDamage=0, reliable=0, armor=0,
+def calculateAverageDamage(hitCritValues=(.5, .05, .45), numD3=0, numD6=1, baseDamage=0, reliable=0, armor=0, isAP=False,
                            resistance=False, exposed=False, critFunction=lancerCritAverageDamage):
     # Rolling to hit
     # hitCritValues = [hitChance, critChance, missChance]
@@ -260,16 +261,16 @@ def calculateAverageDamage(hitCritValues=(.5, .05, .45), numD3=0, numD6=1, baseD
     # Rolling Damage
     # Calculate the standard damage
     averageHitDamage = max(calculateStandardDamage([numD3, numD6, 0])[2], reliable)
-    averageHitDamage = applyDamageOperations(averageHitDamage, baseDamage, armor, resistance, exposed)
+    averageHitDamage = applyDamageOperations(averageHitDamage, baseDamage, armor, isAP, resistance, exposed)
     averageHitDamage *= hitCritValues[0]
 
     # Calculate the crit damage
     averageCritDamage = max(critFunction(numD3, numD6), reliable)
-    averageCritDamage = applyDamageOperations(averageCritDamage, baseDamage, armor, resistance, exposed)
+    averageCritDamage = applyDamageOperations(averageCritDamage, baseDamage, armor, isAP, resistance, exposed)
     averageCritDamage *= hitCritValues[1]
 
     # Calculate the miss damage
-    averageMissDamage = applyDamageOperations(reliable, baseDamage, armor, resistance, exposed)
+    averageMissDamage = applyDamageOperations(reliable, baseDamage, armor, isAP, resistance, exposed)
     averageMissDamage *= hitCritValues[2]
 
     totalAverageDamage = averageCritDamage + averageHitDamage + averageMissDamage
@@ -290,6 +291,18 @@ def calcDifferences(values1, values2):
     return values1[0] - values2[0], values1[1] - values2[1], values1[2] - values2[2]
 
 
+def generateAccuracyRange(evasion=10, hitBonus=0, accuracy=0, accuracyRange=1):
+    # Find the ranges to print out accuracy for
+    accuracyRangeValues = []
+
+    # Go from the bottom of the accuracy range -x, to the top of the accuracy range x
+    for x in range(-1 * accuracyRange, accuracyRange + 1):
+        accuracyRangeValues.append(calculateHitCritChance(evasion, hitBonus, accuracy + x))
+
+    # Returns the list of hitCritValues
+    return accuracyRangeValues
+
+
 def formatHitCritMiss(hitCritMissValues, whiteSpace=0, percentage=True):
     returnString = ""
     returnString += " " * whiteSpace
@@ -300,7 +313,40 @@ def formatHitCritMiss(hitCritMissValues, whiteSpace=0, percentage=True):
     return returnString
 
 
-def printAccuracyRange(evasion=10, hitBonus=0, accuracy=0, accuracyRange=1):
+def printAccuracyRange(accuracyValues: list):
+    accuracyRange = int((len(accuracyValues) - 1) / 2)
+
+    # Print out base values
+    print(f"               Hit  Chance, Crit Chance, Miss Chance")
+    print(f"Base Values:{formatHitCritMiss(accuracyValues[accuracyRange], 3)}")
+    print("-" * 52)
+
+    tracker = len(accuracyValues)-1
+    # start at the accuracy part of the list then go down to the difficulty part of the list
+    for x in range(accuracyRange, -1 * accuracyRange - 1, -1):
+        finalString = ""
+        # If x is greater than 0 it is an accuracy
+        if x > 0:
+            finalString += f"Accuracy  "
+        # if x is less than 0 it is a difficulty
+        elif x < 0:
+            finalString += f"Difficulty"
+        # otherwise it is the bse value
+        else:
+            finalString += f"Base Value"
+
+        finalString += f" + {abs(x)}:"
+
+        # Tracker starts at the last list value, this is the accuracy values
+        # Accuracy range itself should always be the base values
+        # Prints Accuracy to Difficulty
+        differences = calcDifferences(accuracyValues[tracker], accuracyValues[accuracyRange])
+        finalString += formatHitCritMiss(differences)
+        tracker -= 1
+        print(finalString)
+
+
+def printAccuracyRangeOld(evasion=10, hitBonus=0, accuracy=0, accuracyRange=1):
     # Find the ranges to print out accuracy for
     hitCritValues = []
 
@@ -338,23 +384,44 @@ def printAccuracyRange(evasion=10, hitBonus=0, accuracy=0, accuracyRange=1):
         print(finalString)
 
 
+class Target:
+    def __init__(self, evasion, armor, resistance, exposed):
+        self.evasion = evasion
+        self.armor = armor
+        self.resistance = resistance
+        self.exposed = exposed
+
+
 class Attack:
-    def __init__(self, hitBonus, accuracy, numD3, numD6, baseDamage, critFunction):
+    def __init__(self, hitBonus, accuracy, numD3, numD6, baseDamage, reliable, isAP,
+                 critFunction=lancerCritAverageDamage):
         self.hitBonus = hitBonus
         self.accuracy = accuracy
         self.numD3 = numD3
         self.numD6 = numD6
         self.baseDamage = baseDamage
+        self.reliable = reliable
+        self.isAP = isAP
         self.critFunction = critFunction
 
 
-evasion = 10
-hitBonus = 4
-accuracy = 0
+class AttackGroup:
+    def __init__(self, *attacks: Attack):
+        self.attacks = attacks
 
-printAccuracyRange(evasion=evasion, hitBonus=hitBonus, accuracy=accuracy, accuracyRange=1)
+    def attackTarget(self, target: Target):
+        pass
 
-currentDamage = calculateAverageDamage(calculateHitCritChance(evasion, hitBonus, accuracy), numD3=0, numD6=0,
-                                       baseDamage=7, reliable=4, armor=1, resistance=False, exposed=False,
-                                       critFunction=lancerNoCritDamage)
+
+testEvasion = 10
+testHitBonus = 2
+testAccuracy = 1
+
+accuracyRanges = generateAccuracyRange(testEvasion, testHitBonus, testAccuracy, accuracyRange=1)
+
+printAccuracyRange(accuracyRanges)
+
+currentDamage = calculateAverageDamage(calculateHitCritChance(testEvasion, testHitBonus, testAccuracy), numD3=1, numD6=0,
+                                       baseDamage=0, reliable=0, armor=3, isAP=True, resistance=False, exposed=False,
+                                       critFunction=lancerCritAverageDamage)
 print(f"\nCurrent Average Damage: {currentDamage}")
