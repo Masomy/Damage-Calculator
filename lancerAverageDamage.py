@@ -48,7 +48,7 @@ def calculateDiceAverage(diceSize=6):
 # Expected (0, 3, 0): .80, .25, 0
 # Expected (20, 3, 0): 0, .20, .80
 # Expected (10, 0, 1): .5, .175, .275
-def calculateHitCritChance(evasion=10, hitBonus=0, accuracy=0):
+def calculateHitCritChance(evasion=10, hitBonus=0, accuracy=0, invisible=False):
     overallHitChance = 0
     overallCritChance = 0
     overallMissChance = 0
@@ -66,6 +66,11 @@ def calculateHitCritChance(evasion=10, hitBonus=0, accuracy=0):
             overallHitChance += values[0] * accuracyChance
             overallCritChance += values[1] * accuracyChance
             overallMissChance += values[2] * accuracyChance
+
+    if invisible:
+        overallHitChance /= 2
+        overallCritChance /= 2
+        overallMissChance = 1 - overallHitChance - overallCritChance
 
     return overallHitChance, overallCritChance, overallMissChance
 
@@ -253,8 +258,8 @@ def applyDamageOperations(avgDamage, baseDamage=0, armor=0, isAP=False, resistan
     return max(0, damage)
 
 
-def calculateAverageDamage(hitCritValues=(.5, .05, .45), numD3=0, numD6=1, baseDamage=0, reliable=0, armor=0, isAP=False,
-                           resistance=False, exposed=False, critFunction=lancerCritAverageDamage):
+def calculateAverageDamage(hitCritValues=(.5, .05, .45), numD3=0, numD6=1, baseDamage=0, reliable=0, armor=0,
+                           isAP=False, resistance=False, exposed=False, critFunction=lancerCritAverageDamage):
     # Rolling to hit
     # hitCritValues = [hitChance, critChance, missChance]
 
@@ -286,42 +291,123 @@ def chanceToStructure(hp=10, evasion=10, hitBonus=0, accuracy=0, numD3=0, numD6=
 """
 
 
+class Target:
+    def __init__(self, evasion, armor, resistance=False, exposed=False, invisible=False, hull=0, systems=0,
+                 engineering=0, agility=0):
+        self.evasion = evasion
+        self.armor = armor
+        self.resistance = resistance
+        self.exposed = exposed
+        self.invisible = invisible
+        self.hull = hull
+        self.agility = agility
+        self.systems = systems
+        self.engineering = engineering
+        self.haseStats = {
+            1: self.hull,
+            2: self.agility,
+            3: self.systems,
+            4: self.engineering
+        }
+        self.currentDifficulty = 0
+        self.givenAccuracy = 0
+
+    def forceSaveChance(self, target=10, accuracy=0, hase=1):
+        # Hase stands for the 4 stats, 1 - hull, 2 - agi, 3 - sys, and 4 - eng.
+        values = calculateHitCritChance(target, self.haseStats[hase], accuracy, self.invisible)
+        return values[0] + values[1]
+
+
+class Attack:
+    def __init__(self, hitBonus, accuracy, numD3, numD6, baseDamage, reliable, isAP,
+                 critFunction=lancerCritAverageDamage):
+        self.hitBonus = hitBonus
+        self.accuracy = accuracy
+        self.numD3 = numD3
+        self.numD6 = numD6
+        self.baseDamage = baseDamage
+        self.reliable = reliable
+        self.isAP = isAP
+        self.critFunction = critFunction
+
+    def calculateDamage(self, target: Target, bonusAccuracy=0):
+        hitValues = calculateHitCritChance(target.evasion, self.hitBonus, self.accuracy + bonusAccuracy,
+                                           target.invisible)
+        return calculateAverageDamage(hitValues, self.numD3, self.numD6, self.baseDamage, self.reliable, target.armor,
+                                      self.isAP, target.resistance, target.exposed, self.critFunction)
+
+
+class Effect:
+    def __init__(self, effectsHit, effectsCrit, effectsMiss, ):
+        pass
+
+
+class AttackGroup:
+    def __init__(self, *attacks: Attack):
+        self.attacks = attacks
+
+    def attackTarget(self, target: Target):
+        pass
+
+
 # Formatting and printing information functions
 def calcDifferences(values1, values2):
     return values1[0] - values2[0], values1[1] - values2[1], values1[2] - values2[2]
 
 
-def generateAccuracyRange(evasion=10, hitBonus=0, accuracy=0, accuracyRange=1):
+def generateAccuracyRange(evasion=10, hitBonus=0, accuracy=0, invisible=False, accuracyRange=1):
     # Find the ranges to print out accuracy for
     accuracyRangeValues = []
 
     # Go from the bottom of the accuracy range -x, to the top of the accuracy range x
     for x in range(-1 * accuracyRange, accuracyRange + 1):
-        accuracyRangeValues.append(calculateHitCritChance(evasion, hitBonus, accuracy + x))
+        accuracyRangeValues.append(calculateHitCritChance(evasion, hitBonus, accuracy + x, invisible))
 
     # Returns the list of hitCritValues
     return accuracyRangeValues
 
 
-def formatHitCritMiss(hitCritMissValues, whiteSpace=0, percentage=True):
+def formatWeaponStats(hitCritMissValues, damage=False, whiteSpace=0, percentage=True):
     returnString = ""
     returnString += " " * whiteSpace
     if percentage:
         returnString += f"{hitCritMissValues[0] * 100: 11.2f}%{hitCritMissValues[1] * 100: 11.2f}%{hitCritMissValues[2] * 100: 11.2f}%"
     else:
         returnString += f"{hitCritMissValues[0]: 12.3f}{hitCritMissValues[1]: 12.3f}{hitCritMissValues[2]: 12.3f}"
+
+    if type(damage) == float:
+        returnString += f"{damage: 12.3f}"
+
     return returnString
 
 
-def printAccuracyRange(accuracyValues: list):
+def printHeader(whiteSpace=15, includeDamage=False):
+    returnString = " " * whiteSpace
+    returnString += "Hit  Chance, Crit Chance, Miss Chance"
+    if includeDamage:
+        returnString += ", Average Damage"
+    print(returnString)
+
+
+def printAccuracyRange(accuracyValues: list, attack=None, target=None):
     accuracyRange = int((len(accuracyValues) - 1) / 2)
 
-    # Print out base values
-    print(f"               Hit  Chance, Crit Chance, Miss Chance")
-    print(f"Base Values:{formatHitCritMiss(accuracyValues[accuracyRange], 3)}")
-    print("-" * 52)
+    if (target is None) or (attack is None):
+        includeDamage = False
+    else:
+        includeDamage = True
 
-    tracker = len(accuracyValues)-1
+    # Print out base values
+    printHeader(includeDamage=includeDamage)
+    if includeDamage:
+        baseDamage = attack.calculateDamage(target)
+    else:
+        baseDamage = 0
+    print(
+        f"Base Values:{formatWeaponStats(accuracyValues[accuracyRange], damage=(baseDamage if includeDamage else includeDamage), whiteSpace=3)}")
+    print("-" * (67 if includeDamage else 52))
+
+    tracker = len(accuracyValues) - 1
     # start at the accuracy part of the list then go down to the difficulty part of the list
     for x in range(accuracyRange, -1 * accuracyRange - 1, -1):
         finalString = ""
@@ -341,87 +427,24 @@ def printAccuracyRange(accuracyValues: list):
         # Accuracy range itself should always be the base values
         # Prints Accuracy to Difficulty
         differences = calcDifferences(accuracyValues[tracker], accuracyValues[accuracyRange])
-        finalString += formatHitCritMiss(differences)
-        tracker -= 1
-        print(finalString)
-
-
-def printAccuracyRangeOld(evasion=10, hitBonus=0, accuracy=0, accuracyRange=1):
-    # Find the ranges to print out accuracy for
-    hitCritValues = []
-
-    # Go from the bottom of the accuracy range -x, to the top of the accuracy range x
-    for x in range(-1 * accuracyRange, accuracyRange + 1):
-        hitCritValues.append(calculateHitCritChance(evasion, hitBonus, accuracy + x))
-
-    # Print out base values
-    print(f"               Hit  Chance, Crit Chance, Miss Chance")
-    print(f"Base Values:{formatHitCritMiss(hitCritValues[accuracyRange], 3)}")
-    print("-" * 52)
-
-    tracker = accuracyRange * 2
-    # start at the top(accuracyRange, included) and go through to the bottom(-accuracyRange, not included)
-    for x in range(accuracyRange, -1 * accuracyRange - 1, -1):
-        finalString = ""
-        # If x is greater than 0 it is an accuracy
-        if x > 0:
-            finalString += f"Accuracy  "
-        # if x is less than 0 it is a difficulty
-        elif x < 0:
-            finalString += f"Difficulty"
-        # otherwise it is the bse value
+        if includeDamage:
+            damageDifference = attack.calculateDamage(target, x) - baseDamage
         else:
-            finalString += f"Base Value"
-
-        finalString += f" + {abs(x)}:"
-
-        # Tracker starts at the last list value, this is the accuracy values
-        # Accuracy range itself should always be the base values
-        # Prints Accuracy to Difficulty
-        differences = calcDifferences(hitCritValues[tracker], hitCritValues[accuracyRange])
-        finalString += formatHitCritMiss(differences)
+            damageDifference = 0
+        finalString += formatWeaponStats(differences, damage=(damageDifference if includeDamage else includeDamage))
         tracker -= 1
         print(finalString)
 
 
-class Target:
-    def __init__(self, evasion, armor, resistance, exposed):
-        self.evasion = evasion
-        self.armor = armor
-        self.resistance = resistance
-        self.exposed = exposed
+displayDamage = True
+currentTarget = Target(evasion=10, armor=0, resistance=False, exposed=False, invisible=True)
+currentWeapon = Attack(hitBonus=2, accuracy=1, numD3=1, numD6=0, baseDamage=0, reliable=0, isAP=False,
+                       critFunction=lancerCritAverageDamage)
 
+accuracyRanges = generateAccuracyRange(currentTarget.evasion, currentWeapon.hitBonus, currentWeapon.accuracy,
+                                       invisible=currentTarget.invisible, accuracyRange=1)
 
-class Attack:
-    def __init__(self, hitBonus, accuracy, numD3, numD6, baseDamage, reliable, isAP,
-                 critFunction=lancerCritAverageDamage):
-        self.hitBonus = hitBonus
-        self.accuracy = accuracy
-        self.numD3 = numD3
-        self.numD6 = numD6
-        self.baseDamage = baseDamage
-        self.reliable = reliable
-        self.isAP = isAP
-        self.critFunction = critFunction
-
-
-class AttackGroup:
-    def __init__(self, *attacks: Attack):
-        self.attacks = attacks
-
-    def attackTarget(self, target: Target):
-        pass
-
-
-testEvasion = 10
-testHitBonus = 2
-testAccuracy = 1
-
-accuracyRanges = generateAccuracyRange(testEvasion, testHitBonus, testAccuracy, accuracyRange=1)
-
-printAccuracyRange(accuracyRanges)
-
-currentDamage = calculateAverageDamage(calculateHitCritChance(testEvasion, testHitBonus, testAccuracy), numD3=1, numD6=0,
-                                       baseDamage=0, reliable=0, armor=3, isAP=True, resistance=False, exposed=False,
-                                       critFunction=lancerCritAverageDamage)
-print(f"\nCurrent Average Damage: {currentDamage}")
+if displayDamage:
+    printAccuracyRange(accuracyRanges, currentWeapon, currentTarget)
+else:
+    printAccuracyRange(accuracyRanges)
