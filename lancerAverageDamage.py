@@ -311,7 +311,7 @@ def lancerCritAverageDamage(numD3, numD6):
 
 
 # The player crit function with an additional d6 added on crit
-def lancerCritCrackshotDamage(numD3, numD6):
+def lancerCritCrackShotDamage(numD3, numD6):
     """
     A standard lancer crit but you add a d6 bonus damage before rolling damage
     :param numD3: Number of D3 in the attack
@@ -404,10 +404,13 @@ def calculateAverageDamage(hitCritValues=(.5, .05, .45), numD3=0, numD6=1, baseD
     averageCritDamage *= hitCritValues[1]
 
     # Calculate the miss damage
-    averageMissDamage = applyDamageOperations(reliable, baseDamage, armor, isAP, resistance, exposed)
+    averageMissDamage = 0
+    averageMissDamage = applyDamageOperations(averageMissDamage, reliable, armor, isAP, resistance, exposed)
     averageMissDamage *= hitCritValues[2]
 
     totalAverageDamage = averageCritDamage + averageHitDamage + averageMissDamage
+    # print(f"Total: {totalAverageDamage}\nHit: {averageHitDamage}
+    # \nCrit: {averageCritDamage}\nMiss: {averageMissDamage}")
     return totalAverageDamage
 
 
@@ -427,6 +430,7 @@ class Target:
     Has an evasion, armor, if its resistant, exposed, or invisible
     As well as its HASE stats for the purposes of making saves
     """
+
     def __init__(self, evasion, armor, resistance=False, exposed=False, invisible=False, hull=0, systems=0,
                  engineering=0, agility=0):
         self.evasion = evasion
@@ -468,6 +472,7 @@ class Attack:
     It has potential damage it can do in the form of D3, D6, base damage, and reliable
     It also has if the attack ignores armor, and what type of crit function it follows.
     """
+
     def __init__(self, hitBonus, accuracy, numD3, numD6, baseDamage, reliable, isAP,
                  critFunction=lancerCritAverageDamage):
         self.hitBonus = hitBonus
@@ -492,6 +497,7 @@ class Effect:
     It has the chance of an effect happening depending on what is rolled.
     Additionally, it has an effect that will modify the target if it happens.
     """
+
     def __init__(self, effectsHit=False, effectsCrit=True, effectsMiss=False, ):
         self.hitChance = 1 if effectsHit else 0
         self.critChance = 1 if effectsCrit else 0
@@ -502,6 +508,7 @@ class AttackGroup:
     """
     A group of attacks that happen one after the other
     """
+
     def __init__(self, *attacks: Attack):
         self.attacks = attacks
 
@@ -545,7 +552,7 @@ def formatWeaponStats(hitCritMissValues, damage=False, whiteSpace=0, percentage=
     """
     Formats hit crit miss values and damage into a nice looking format
     :param hitCritMissValues: The values representing hit chance, crit chance, miss chance
-    :param damage: If its an int it will add damage into its output
+    :param damage: If it's an int it will add damage into its output
     :param whiteSpace: How much white space to put before the whole string of information
     :param percentage: To include it in percentage format or decimal format
     :return: A nicely formatted string with hit, crit, miss, and damage values
@@ -632,8 +639,9 @@ def printAccuracyRange(accuracyValues: list, attack=None, target=None):
 
 
 displayDamage = True
-currentTarget = Target(evasion=10, armor=0, resistance=False, exposed=False, invisible=True)
-currentWeapon = Attack(hitBonus=2, accuracy=1, numD3=1, numD6=0, baseDamage=0, reliable=0, isAP=False,
+currentTarget = Target(evasion=12, armor=0, resistance=False, exposed=False, invisible=False,
+                       hull=4, agility=6, systems=0, engineering=0)
+currentWeapon = Attack(hitBonus=2, accuracy=-1, numD3=0, numD6=0, baseDamage=14, reliable=0, isAP=False,
                        critFunction=lancerCritAverageDamage)
 
 accuracyRanges = generateAccuracyRange(currentTarget.evasion, currentWeapon.hitBonus, currentWeapon.accuracy,
@@ -643,3 +651,5 @@ if displayDamage:
     printAccuracyRange(accuracyRanges, currentWeapon, currentTarget)
 else:
     printAccuracyRange(accuracyRanges)
+stunChance = currentTarget.forceSaveChance(13, 0, 1)
+print(f"Chance to fail the save: {stunChance*100: .3f}%\nOverall Chance to Stun: {stunChance * (1-accuracyRanges[1][2]) * 100: .3f}%")
