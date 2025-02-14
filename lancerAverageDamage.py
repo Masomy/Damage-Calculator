@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 averageD3 = 2
 averageD6 = 3.5
 
@@ -93,15 +95,18 @@ def calculateD20Percentage(evasion=10, hitBonus=0):
     :param hitBonus: How much is added to the d20 roll
     :return: (hitChance, critChance, missChance)
     """
-    # This is the critical hit number
+    # This is the number you need to roll equal to or above on the dice to crit
     critNumber = 20
+    # This is the number you need to roll equal to or above to hit, but below the crit number.
     # Evasion is capped at 20 per rules of lancer
     evasion = 20 if evasion > critNumber else evasion
 
     # Adjust evasion and number needed on the dice to get a crit by its hit bonus
     evasion -= hitBonus
     critNumber -= hitBonus
+
     # Calculate based on the range of 1 to 20 if the value would crit, hit, or miss.
+    # Checks for if it's possible to crit at all, or always crits, otherwise it calculates the normal crit range
     if critNumber > 20:
         critChance = 0
     elif critNumber < 1:
@@ -109,6 +114,7 @@ def calculateD20Percentage(evasion=10, hitBonus=0):
     else:
         critChance = (20 - critNumber + 1) / 20
 
+    # Works through to calculate the hit chance
     if evasion < 1:
         hitChance = 1 - critChance
     elif evasion > 20:
@@ -116,12 +122,13 @@ def calculateD20Percentage(evasion=10, hitBonus=0):
     else:
         hitChance = (critNumber - evasion) / 20
 
+    #
     missChance = 1 - hitChance - critChance
 
     return hitChance, critChance, missChance
 
 
-def calculateMaxOfD6(expectedValue, accuracy):
+def calculateMaxOfD6(expectedValue: int, accuracy: int):
     """
     Rolls a number of d6 equal to the accuracy and takes the highest dice.
     :param expectedValue: The value to find the number of ways to calculate it
@@ -140,7 +147,7 @@ def calculateMaxOfD6(expectedValue, accuracy):
 # Damage functions.
 # DamageList[numD3, numD6, avgDamage]
 
-def addD6Dice(damageList, addedDice=1):
+def addD6Dice(damageList: list, addedDice=1):
     """
     Adds d6 dice to the number of d6 dice
     :param damageList: numD3, numD6, avgDamage. This is the list being passed around by damage functions
@@ -151,7 +158,7 @@ def addD6Dice(damageList, addedDice=1):
     return damageList
 
 
-def addD3Dice(damageList, addedDice=1):
+def addD3Dice(damageList: list, addedDice=1):
     """
     Adds 1 d3 dice to the number of d3 dice
     :param damageList: numD3, numD6, avgDamage. This is the list being passed around by damage functions
@@ -163,7 +170,7 @@ def addD3Dice(damageList, addedDice=1):
     return damageList
 
 
-def addD6Damage(damageList, addedDice=1):
+def addD6Damage(damageList: list, addedDice=1):
     """
     Adds 1 d6 worth of damage to average damage
     :param damageList: numD3, numD6, avgDamage. This is the list being passed around by damage functions
@@ -174,7 +181,7 @@ def addD6Damage(damageList, addedDice=1):
     return damageList
 
 
-def addD3Damage(damageList, addedDice=1):
+def addD3Damage(damageList: list, addedDice=1):
     """
     Adds 1 d3 worth of damage to average damage
     :param damageList: numD3, numD6, avgDamage. This is the list being passed around by damage functions
@@ -185,7 +192,7 @@ def addD3Damage(damageList, addedDice=1):
     return damageList
 
 
-def multD3Dice(damageList, diceMultiplier=2):
+def multD3Dice(damageList: list, diceMultiplier=2):
     """
     Multiplies the number of d3 dice by diceMultiplier
     :param damageList: numD3, numD6, avgDamage. This is the list being passed around by damage functions
@@ -196,7 +203,7 @@ def multD3Dice(damageList, diceMultiplier=2):
     return damageList
 
 
-def multD6Dice(damageList, diceMultiplier=2):
+def multD6Dice(damageList: list, diceMultiplier=2):
     """
     Multiplies the number of d6 dice by diceMultiplier
     :param damageList: numD3, numD6, avgDamage. This is the list being passed around by damage functions
@@ -207,7 +214,7 @@ def multD6Dice(damageList, diceMultiplier=2):
     return damageList
 
 
-def calculateStandardDamage(damageList, otherParam=0):
+def calculateStandardDamage(damageList: list, otherParam=0):
     """
     Converts all the current dice into average damage.
     Sets all the dice to 0 and calculates the damage based on its average damage
@@ -231,7 +238,7 @@ def calculateStandardDamage(damageList, otherParam=0):
 # Functions meant specifically for critical hits
 
 # Multiplies the damage by the multiplier
-def critMultiplier(damageList, multiplier=2):
+def critMultiplier(damageList: list, multiplier=2):
     """
     Multiplies avgDamage by the multiplier
     :param damageList: numD3, numD6, avgDamage. This is the list being passed around by damage functions
@@ -243,7 +250,7 @@ def critMultiplier(damageList, multiplier=2):
 
 
 # Converts the numDice to averageDamage based on the max function.
-def calculateMaxFunction(damageList, otherParam=0):
+def calculateMaxFunction(damageList: list, otherParam=0):
     """
     Converts the number of dice into average damage by lancer's crit system
     Aka roll 2 times the number of dice and take the highest combination of dice.
@@ -299,7 +306,7 @@ def generalCritFunction(numD3: int, numD6: int, *, functionOrderingList: list, f
 # Complete Crit Functions. They all take in numD3, and numD6. They all return averageCritDamage
 
 # The normal player crit damage
-def lancerCritAverageDamage(numD3, numD6):
+def lancerCritAverageDamage(numD3: int, numD6: int):
     """
     The standard Lancer Crit function. Roll 2 times the dice and take highest.
     :param numD3: Number of D3 dice in the attack
@@ -311,7 +318,7 @@ def lancerCritAverageDamage(numD3, numD6):
 
 
 # The player crit function with an additional d6 added on crit
-def lancerCritCrackShotDamage(numD3, numD6):
+def lancerCritCrackShotDamage(numD3: int, numD6: int):
     """
     A standard lancer crit but you add a d6 bonus damage before rolling damage
     :param numD3: Number of D3 in the attack
@@ -323,7 +330,7 @@ def lancerCritCrackShotDamage(numD3, numD6):
 
 
 # The damage from a crit if its damage is treated like a standard hit
-def lancerNoCritDamage(numD3, numD6):
+def lancerNoCritDamage(numD3: int, numD6: int):
     """
     Treats the crit damage like normal damage
     :param numD3: Number of D3 in the attack
@@ -335,7 +342,7 @@ def lancerNoCritDamage(numD3, numD6):
 
 
 # An enemy crit with deadly(added d6)
-def lancerDeadlyEnemyCrit(numD3, numD6):
+def lancerDeadlyEnemyCrit(numD3: int, numD6: int):
     """
     An enemy crit with deadly. You treat all damage like standard damage with an extra d6 bonus damage
     :param numD3: The number of D3 in the base attack
@@ -346,7 +353,7 @@ def lancerDeadlyEnemyCrit(numD3, numD6):
                                functionParameters=[1, 0])
 
 
-def applyDamageOperations(avgDamage, baseDamage=0, armor=0, isAP=False, resistance=False, exposed=False):
+def applyDamageOperations(avgDamage: float, baseDamage=0, armor=0, isAP=False, resistance=False, exposed=False):
     """
     Applies the standard lancer damage operations to the damage.
     :param avgDamage: The avgDamage of the dice
@@ -431,7 +438,7 @@ class Target:
     As well as its HASE stats for the purposes of making saves
     """
 
-    def __init__(self, evasion, armor, resistance=False, exposed=False, invisible=False, hull=0, systems=0,
+    def __init__(self, evasion: int, armor: int, resistance=False, exposed=False, invisible=False, hull=0, systems=0,
                  engineering=0, agility=0):
         self.evasion = evasion
         self.armor = armor
@@ -463,6 +470,9 @@ class Target:
         values = calculateHitCritChance(target, self.haseStats[hase], accuracy, self.invisible)
         return values[2]
 
+    def compareAttacks(self, attack1: Attack, attack2: Attack):
+        pass
+
 
 class Attack:
     """
@@ -473,8 +483,8 @@ class Attack:
     It also has if the attack ignores armor, and what type of crit function it follows.
     """
 
-    def __init__(self, hitBonus, accuracy, numD3, numD6, baseDamage, reliable, isAP,
-                 critFunction=lancerCritAverageDamage):
+    def __init__(self, hitBonus: int, accuracy: int, numD3: int, numD6: int, baseDamage: int, reliable: int,
+                 isAP: False, critFunction=lancerCritAverageDamage):
         self.hitBonus = hitBonus
         self.accuracy = accuracy
         self.numD3 = numD3
@@ -489,6 +499,10 @@ class Attack:
                                            target.invisible)
         return calculateAverageDamage(hitValues, self.numD3, self.numD6, self.baseDamage, self.reliable, target.armor,
                                       self.isAP, target.resistance, target.exposed, self.critFunction)
+
+    def accuracyRangeAgainstTarget(self, target: Target, accuracyRange=1):
+        accuracyRanges = generateAccuracyRange(target.evasion, self.hitBonus, self.accuracy, target.invisible, accuracyRange)
+        printAccuracyRange(accuracyRanges, self, target)
 
 
 class Effect:
@@ -517,7 +531,7 @@ class AttackGroup:
 
 
 # Formatting and printing information functions
-def calcDifferences(values1, values2):
+def calcDifferences(values1: list, values2: list):
     """
     Calculates the difference between two sets of 3 values
     :param values1: a list of 3 values
@@ -548,7 +562,7 @@ def generateAccuracyRange(evasion=10, hitBonus=0, accuracy=0, invisible=False, a
     return accuracyRangeValues
 
 
-def formatWeaponStats(hitCritMissValues, damage=False, whiteSpace=0, percentage=True):
+def formatWeaponStats(hitCritMissValues: list, damage=False, whiteSpace=0, percentage=True):
     """
     Formats hit crit miss values and damage into a nice looking format
     :param hitCritMissValues: The values representing hit chance, crit chance, miss chance
@@ -638,18 +652,25 @@ def printAccuracyRange(accuracyValues: list, attack=None, target=None):
         print(finalString)
 
 
+# Main Code
 displayDamage = True
-currentTarget = Target(evasion=12, armor=0, resistance=False, exposed=False, invisible=False,
-                       hull=4, agility=6, systems=0, engineering=0)
-currentWeapon = Attack(hitBonus=2, accuracy=-1, numD3=0, numD6=0, baseDamage=14, reliable=0, isAP=False,
+currentTarget = Target(evasion=11, armor=1, resistance=False, exposed=False, invisible=False,
+                       hull=4, agility=2, systems=0, engineering=0)
+
+averageTier1Target = Target(evasion=9, armor=1, resistance=False, exposed=False, invisible=False,
+                            hull=0, agility=0, systems=1, engineering=1)
+averageTier2Target = Target(evasion=11, armor=1, resistance=False, exposed=False, invisible=False,
+                            hull=1, agility=1, systems=2, engineering=2)
+averageTier3Target = Target(evasion=12, armor=1, resistance=False, exposed=False, invisible=False,
+                            hull=1, agility=2, systems=2, engineering=2)
+
+currentWeapon = Attack(hitBonus=2, accuracy=0, numD3=0, numD6=0, baseDamage=9, reliable=0, isAP=False,
                        critFunction=lancerCritAverageDamage)
 
 accuracyRanges = generateAccuracyRange(currentTarget.evasion, currentWeapon.hitBonus, currentWeapon.accuracy,
-                                       invisible=currentTarget.invisible, accuracyRange=1)
+                                       invisible=currentTarget.invisible, accuracyRange=2)
 
-if displayDamage:
-    printAccuracyRange(accuracyRanges, currentWeapon, currentTarget)
-else:
-    printAccuracyRange(accuracyRanges)
+
+currentWeapon.accuracyRangeAgainstTarget(averageTier2Target, 2)
 stunChance = currentTarget.forceSaveChance(13, 0, 1)
 print(f"Chance to fail the save: {stunChance*100: .3f}%\nOverall Chance to Stun: {stunChance * (1-accuracyRanges[1][2]) * 100: .3f}%")
