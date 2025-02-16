@@ -1,4 +1,5 @@
 from __future__ import annotations
+from calculateAttackValues import calculateHitCritChance
 
 averageD3 = 2
 averageD6 = 3.5
@@ -44,104 +45,6 @@ def calculateDiceAverage(diceSize=6):
     :return: Returns the average value rolled on the dice
     """
     return (1 + diceSize) / 2
-
-
-# Calculating HitCritMiss Functions
-# Expected (10, 0, 0): .5, .05, .45
-# Expected (0, 0, 0): .95, .05, 0
-# Expected (20, 0, 0): 0, .05, .95
-# Expected (10, 3, 0): .5, .20, .30
-# Expected (0, 3, 0): .80, .25, 0
-# Expected (20, 3, 0): 0, .20, .80
-# Expected (10, 0, 1): .5, .175, .275
-def calculateHitCritChance(evasion=10, hitBonus=0, accuracy=0, invisible=False):
-    """
-    Calculate the chance of each of the three outcomes, hit, crit, miss
-    :param evasion: The number to exceed to have the effect hit
-    :param hitBonus: What is added to the roll
-    :param accuracy: How much accuracy the roll is being made with
-    :param invisible: If the target is invisible. Reduces hit and crit chance in half.
-    :return: Hit Chance[0], Crit Chance[1], Miss Chance[0]
-    """
-    overallHitChance = 0
-    overallCritChance = 0
-    overallMissChance = 0
-
-    if accuracy == 0:
-        values = calculateD20Percentage(evasion, hitBonus)
-        overallHitChance = values[0]
-        overallCritChance = values[1]
-        overallMissChance = values[2]
-    elif accuracy != 0:
-        for x in range(1, 7):
-            sign = 1 if accuracy > 0 else -1
-            accuracyChance = calculateMaxOfD6(x, abs(accuracy))
-            values = calculateD20Percentage(evasion, hitBonus + (x * sign))
-            overallHitChance += values[0] * accuracyChance
-            overallCritChance += values[1] * accuracyChance
-            overallMissChance += values[2] * accuracyChance
-
-    if invisible:
-        overallHitChance /= 2
-        overallCritChance /= 2
-        overallMissChance = 1 - overallHitChance - overallCritChance
-
-    return overallHitChance, overallCritChance, overallMissChance
-
-
-def calculateD20Percentage(evasion=10, hitBonus=0):
-    """
-    :param evasion: The number to exceed
-    :param hitBonus: How much is added to the d20 roll
-    :return: (hitChance, critChance, missChance)
-    """
-    # This is the number you need to roll equal to or above on the dice to crit
-    critNumber = 20
-    # This is the number you need to roll equal to or above to hit, but below the crit number.
-    # Evasion is capped at 20 per rules of lancer
-    evasion = 20 if evasion > critNumber else evasion
-
-    # Adjust evasion and number needed on the dice to get a crit by its hit bonus
-    evasion -= hitBonus
-    critNumber -= hitBonus
-
-    # Calculate based on the range of 1 to 20 if the value would crit, hit, or miss.
-    # Checks for if it's possible to crit at all, or always crits, otherwise it calculates the normal crit range
-    if critNumber > 20:
-        critChance = 0
-    elif critNumber < 1:
-        critChance = 1
-    else:
-        critChance = (20 - critNumber + 1) / 20
-
-    # Works through to calculate the hit chance
-    if evasion < 1:
-        hitChance = 1 - critChance
-    elif evasion > 20:
-        hitChance = 0
-    else:
-        hitChance = (critNumber - evasion) / 20
-
-    #
-    missChance = 1 - hitChance - critChance
-
-    return hitChance, critChance, missChance
-
-
-def calculateMaxOfD6(expectedValue: int, accuracy: int):
-    """
-    Rolls a number of d6 equal to the accuracy and takes the highest dice.
-    :param expectedValue: The value to find the number of ways to calculate it
-    :param accuracy: How many dice are being rolled
-    :return: The probability of expectedValue occurring given accuracy d6 dice are rolled.
-    """
-    # Takes in a number of d6 and selects the highest 1
-    # Takes in a positive value for expected value and accuracy.
-    # Return chance
-    if expectedValue > 7 or expectedValue < 1:
-        return 0
-    # Calculate percentage for something
-    return (pow(expectedValue, accuracy) - pow(expectedValue - 1, accuracy)) / pow(6, accuracy)
 
 
 # Damage functions.
@@ -377,7 +280,7 @@ def applyDamageOperations(avgDamage: float, baseDamage=0, armor=0, isAP=False, r
         damage -= armor
     if resistance:
         damage /= 2
-    return max(0, damage)
+    return max(0.0, damage)
 
 
 def calculateAverageDamage(hitCritValues=(.5, .05, .45), numD3=0, numD6=1, baseDamage=0, reliable=0, armor=0,
@@ -398,27 +301,46 @@ def calculateAverageDamage(hitCritValues=(.5, .05, .45), numD3=0, numD6=1, baseD
     """
     # Rolling to hit
     # hitCritValues = [hitChance, critChance, missChance]
+    # Rolling Damage
+    damageValues = calculateHitCritMissDamage(numD3, numD6, baseDamage, reliable, armor, isAP, resistance, exposed,
+                                              critFunction)
 
+    # Bring all the damage together
+    totalAverageDamage = damageValues[0] * hitCritValues[0]
+    totalAverageDamage += damageValues[1] * hitCritValues[1]
+    totalAverageDamage += damageValues[2] * hitCritValues[2]
+    return totalAverageDamage
+
+
+def calculateHitCritMissDamage(numD3=0, numD6=1, baseDamage=0, reliable=0, armor=0,
+                               isAP=False, resistance=False, exposed=False, critFunction=lancerCritAverageDamage):
+    """
+        Calculates the average damage given the conditions. Including which critFunction it wants to use
+        :param numD3: The number of D3 in the attack
+        :param numD6: The number of D6 in the attack
+        :param baseDamage: The damage not tied to the dice roll of an attack
+        :param reliable: The minimum damage of the attack even if it misses
+        :param armor: How much armor the target has
+        :param isAP: If the attack ignores armor
+        :param resistance: If the target is resistant to the damage
+        :param exposed: If the target is exposed
+        :param critFunction: What type of crit the attack performs
+        :return:
+        """
     # Rolling Damage
     # Calculate the standard damage
     averageHitDamage = max(calculateStandardDamage([numD3, numD6, 0])[2], reliable)
     averageHitDamage = applyDamageOperations(averageHitDamage, baseDamage, armor, isAP, resistance, exposed)
-    averageHitDamage *= hitCritValues[0]
 
     # Calculate the crit damage
     averageCritDamage = max(critFunction(numD3, numD6), reliable)
     averageCritDamage = applyDamageOperations(averageCritDamage, baseDamage, armor, isAP, resistance, exposed)
-    averageCritDamage *= hitCritValues[1]
 
     # Calculate the miss damage
     averageMissDamage = 0
     averageMissDamage = applyDamageOperations(averageMissDamage, reliable, armor, isAP, resistance, exposed)
-    averageMissDamage *= hitCritValues[2]
 
-    totalAverageDamage = averageCritDamage + averageHitDamage + averageMissDamage
-    # print(f"Total: {totalAverageDamage}\nHit: {averageHitDamage}
-    # \nCrit: {averageCritDamage}\nMiss: {averageMissDamage}")
-    return totalAverageDamage
+    return averageHitDamage, averageCritDamage, averageMissDamage
 
 
 """
@@ -533,12 +455,19 @@ class AttackGroup:
 # Formatting and printing information functions
 def calcDifferences(values1: list, values2: list):
     """
-    Calculates the difference between two sets of 3 values
-    :param values1: a list of 3 values
-    :param values2: a list of 3 values to be subtracted from values1
+    Takes in 2 lists of ints of the same length and gives the differences between values1 and values2
+    :param values1: a list of ints
+    :param values2: a list of ints to be subtracted from values1
     :return: A list with values1 - values2 for each item in the lists.
     """
-    return values1[0] - values2[0], values1[1] - values2[1], values1[2] - values2[2]
+    if len(values1) != len(values2):
+        return
+
+    outputList = []
+    for x in range(len(values1)):
+        outputList.append(values1[x] - values2[x])
+
+    return outputList
 
 
 def generateAccuracyRange(evasion=10, hitBonus=0, accuracy=0, invisible=False, accuracyRange=1):
@@ -573,10 +502,12 @@ def formatWeaponStats(hitCritMissValues: list, damage=False, whiteSpace=0, perce
     """
     returnString = ""
     returnString += " " * whiteSpace
-    if percentage:
-        returnString += f"{hitCritMissValues[0] * 100: 11.2f}%{hitCritMissValues[1] * 100: 11.2f}%{hitCritMissValues[2] * 100: 11.2f}%"
-    else:
-        returnString += f"{hitCritMissValues[0]: 12.3f}{hitCritMissValues[1]: 12.3f}{hitCritMissValues[2]: 12.3f}"
+
+    for value in hitCritMissValues:
+        if percentage:
+            returnString += f"{value * 100: 11.2f}%"
+        else:
+            returnString += f"{value: 12.3f}"
 
     if type(damage) == float:
         returnString += f"{damage: 12.3f}"
@@ -650,6 +581,10 @@ def printAccuracyRange(accuracyValues: list, attack=None, target=None):
         finalString += formatWeaponStats(differences, damage=(damageDifference if includeDamage else includeDamage))
         tracker -= 1
         print(finalString)
+
+
+def printDamageAccuracyRange():
+    pass
 
 
 # Main Code
