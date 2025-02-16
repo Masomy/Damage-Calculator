@@ -94,3 +94,25 @@ def calculateMaxOfD6(expectedValue: int, accuracy: int):
         return 0
     # Calculate percentage for something
     return (pow(expectedValue, accuracy) - pow(expectedValue - 1, accuracy)) / pow(6, accuracy)
+
+
+def generateAccuracyRange(evasion=10, hitBonus=0, accuracy=0, invisible=False, accuracyRange=1):
+    """
+    Creates a range of hit values + or - difficulty/accuracy from the base accuracy level
+    :param evasion: The target number to beat to hit
+    :param hitBonus: The number added to the d20
+    :param accuracy: The base accuracy of the attack
+    :param invisible: If the target is invisible
+    :param accuracyRange: How many difficulty and accuracy to go away from the base accuracy
+    :return: A range of hit values from least accurate to most accurate
+    """
+    # Find the ranges to print out accuracy for
+    accuracyRangeValues = []
+
+    # Go from the bottom of the accuracy range -x, to the top of the accuracy range x
+    for x in range(-1 * accuracyRange, accuracyRange + 1):
+        accuracyRangeValues.append(calculateHitCritChance(evasion, hitBonus, accuracy + x, invisible))
+
+    # Returns the list of hitCritValues
+    return accuracyRangeValues
+

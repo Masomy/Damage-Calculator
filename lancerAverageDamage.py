@@ -1,5 +1,5 @@
 from __future__ import annotations
-from calculateAttackValues import calculateHitCritChance
+from calculateAttackValues import calculateHitCritChance, generateAccuracyRange
 
 averageD3 = 2
 averageD6 = 3.5
@@ -359,7 +359,6 @@ class Target:
     Has an evasion, armor, if its resistant, exposed, or invisible
     As well as its HASE stats for the purposes of making saves
     """
-
     def __init__(self, evasion: int, armor: int, resistance=False, exposed=False, invisible=False, hull=0, systems=0,
                  engineering=0, agility=0):
         self.evasion = evasion
@@ -468,27 +467,6 @@ def calcDifferences(values1: list, values2: list):
         outputList.append(values1[x] - values2[x])
 
     return outputList
-
-
-def generateAccuracyRange(evasion=10, hitBonus=0, accuracy=0, invisible=False, accuracyRange=1):
-    """
-    Creates a range of hit values + or - difficulty/accuracy from the base accuracy level
-    :param evasion: The target number to beat to hit
-    :param hitBonus: The number added to the d20
-    :param accuracy: The base accuracy of the attack
-    :param invisible: If the target is invisible
-    :param accuracyRange: How many difficulty and accuracy to go away from the base accuracy
-    :return: A range of hit values from least accurate to most accurate
-    """
-    # Find the ranges to print out accuracy for
-    accuracyRangeValues = []
-
-    # Go from the bottom of the accuracy range -x, to the top of the accuracy range x
-    for x in range(-1 * accuracyRange, accuracyRange + 1):
-        accuracyRangeValues.append(calculateHitCritChance(evasion, hitBonus, accuracy + x, invisible))
-
-    # Returns the list of hitCritValues
-    return accuracyRangeValues
 
 
 def formatWeaponStats(hitCritMissValues: list, damage=False, whiteSpace=0, percentage=True):
